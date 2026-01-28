@@ -26,6 +26,7 @@ import re
 import logging
 import subprocess
 import asyncio
+import http.client
 from dataclasses import dataclass
 from typing import List, Dict, Optional
 
@@ -54,48 +55,15 @@ class Config:
     TELEGRAM_CHAT_ID: str = os.getenv('TELEGRAM_CHAT_ID', '').strip()
     DEEPGRAM_API_KEY: str = os.getenv('DEEPGRAM_API_KEY', '').strip()
     GEMINI_API_KEY: str = os.getenv('GEMINI_API_KEY', '').strip()
-    YOUTUBE_COOKIES: str = os.getenv('YOUTUBE_COOKIES', '').strip()
+    
+    # RapidAPI Configuration
+    RAPIDAPI_KEY: str = os.getenv('RAPIDAPI_KEY', '').strip()
+    RAPIDAPI_HOST: str = 'youtube-video-and-shorts-downloader.p.rapidapi.com'
     
     FFMPEG_TIMEOUT: int = 600
-    COOKIE_FILE: str = './data/cookies.txt'
+    DOWNLOAD_TIMEOUT: int = 300
 
-    def setup_cookies(self):
-        if self.YOUTUBE_COOKIES:
-            try:
-                # 1. Decode Base64 if needed
-                content = self.YOUTUBE_COOKIES
-                if "Netscape" not in content and "{" not in content and len(content) > 20:
-                    try:
-                        import base64
-                        content = base64.b64decode(content).decode('utf-8')
-                    except:
-                        pass
-                
-                # 2. Convert JSON to Netscape (EditThisCookie format -> yt-dlp format)
-                if content.strip().startswith('['):
-                    try:
-                        import json
-                        cookies = json.loads(content)
-                        lines = ["# Netscape HTTP Cookie File"]
-                        for c in cookies:
-                            domain = c.get('domain', '')
-                            flag = 'TRUE' if domain.startswith('.') else 'FALSE'
-                            path = c.get('path', '/')
-                            secure = 'TRUE' if c.get('secure') else 'FALSE'
-                            expiry = str(int(c.get('expirationDate', 0)))
-                            name = c.get('name', '')
-                            value = c.get('value', '')
-                            lines.append(f"{domain}\t{flag}\t{path}\t{secure}\t{expiry}\t{name}\t{value}")
-                        content = "\n".join(lines)
-                        logger.info("✅ Converted JSON cookies to Netscape format")
-                    except Exception as e:
-                        logger.error(f"Cookie conversion error: {e}")
 
-                with open(self.COOKIE_FILE, 'w') as f:
-                    f.write(content)
-                logger.info("✅ YouTube Cookies loaded")
-            except Exception as e:
-                logger.error(f"❌ Failed to load cookies: {e}")
 
     def setup_directories(self):
         for folder in [self.OUTPUT_FOLDER, self.TEMP_FOLDER]:
@@ -107,6 +75,7 @@ class Config:
         if not self.TELEGRAM_BOT_TOKEN: missing.append('TELEGRAM_BOT_TOKEN')
         if not self.DEEPGRAM_API_KEY: missing.append('DEEPGRAM_API_KEY')
         if not self.GEMINI_API_KEY: missing.append('GEMINI_API_KEY')
+        if not self.RAPIDAPI_KEY: missing.append('RAPIDAPI_KEY')
         
         if missing:
             logger.error(f"❌ Missing: {', '.join(missing)}")
@@ -115,7 +84,6 @@ class Config:
 
 CONFIG = Config()
 CONFIG.setup_directories()
-CONFIG.setup_cookies()
 CONFIG.validate()
 
 # ==================== YOUTUBE FINDER ====================
@@ -352,42 +320,141 @@ class VideoProcessor:
         self.config = config
 
     def download_video(self, url: str) -> Optional[str]:
-        """Download video using POT plugin for YouTube bypass."""
+        """Download video using RapidAPI."""
         video_id_match = re.search(r'(?:v=|/)([0-9A-Za-z_-]{11})', url)
-        video_id = video_id_match.group(1) if video_id_match else "temp"
-        path = f"{self.config.TEMP_FOLDER}/video_{video_id}.mp4"
-        if os.path.exists(path): os.remove(path)
+        video_id = video_id_match.group(1) if video_id_match else None
         
-        opts = {
-            'format': 'bv*+ba/b',  # Best video + best audio, fallback to best
-            'outtmpl': path.replace('.mp4', '') + '.%(ext)s',
-            'merge_output_format': 'mp4',
-            'quiet': True,
-            'no_warnings': True,
-        }
-        
-        if os.path.exists(self.config.COOKIE_FILE):
-            opts['cookiefile'] = self.config.COOKIE_FILE
-
-        try:
-            logger.info(f"⬇️ Downloading video {video_id}...")
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                ydl.download([url])
-            
-            # Find downloaded file (extension may vary)
-            import glob
-            downloaded_files = glob.glob(path.replace('.mp4', '') + '.*')
-            if downloaded_files:
-                actual_path = downloaded_files[0]
-                if not actual_path.endswith('.mp4'):
-                    import shutil
-                    shutil.move(actual_path, path)
-                    actual_path = path
-                logger.info(f"✅ Downloaded: {os.path.getsize(actual_path) / (1024*1024):.1f} MB")
-                return actual_path
+        if not video_id:
+            logger.error(f"❌ Could not extract video ID from URL: {url}")
             return None
+        
+        logger.info(f"📥 Downloading via RapidAPI: {video_id}")
+        
+        try:
+            # Step 1: Get video info from RapidAPI
+            conn = http.client.HTTPSConnection(self.config.RAPIDAPI_HOST)
+            headers = {
+                'x-rapidapi-key': self.config.RAPIDAPI_KEY,
+                'x-rapidapi-host': self.config.RAPIDAPI_HOST
+            }
+            
+            conn.request("GET", f"/download.php?id={video_id}", headers=headers)
+            res = conn.getresponse()
+            data = res.read()
+            
+            if res.status != 200:
+                logger.error(f"❌ RapidAPI error: HTTP {res.status}")
+                return None
+            
+            json_data = json.loads(data.decode("utf-8"))
+            
+            if json_data.get('status') != 'ok':
+                logger.error(f"❌ API returned error: {json_data.get('message', 'Unknown')}")
+                return None
+            
+            # Step 2: Find best format
+            formats = json_data.get('results', json_data.get('formats', json_data.get('videos', [])))
+            
+            if not formats:
+                logger.error("❌ No formats available")
+                return None
+            
+            # Select format - prioritize video with audio
+            selected_url = None
+            selected_quality = "unknown"
+            
+            # Priority 1: Video with audio at good quality
+            for fmt in formats:
+                quality = str(fmt.get('quality', '') or fmt.get('qualityLabel', '') or '').lower()
+                mime = str(fmt.get('mime', '') or fmt.get('mimeType', '') or '').lower()
+                url_candidate = fmt.get('url', '')
+                
+                # Skip if no URL or if it's audio-only
+                if not url_candidate or 'audio/mp4' in mime or 'audio/m4a' in mime:
+                    continue
+                
+                # Prefer 720p/480p with video
+                if 'video' in mime and ('720' in quality or '480' in quality):
+                    selected_url = url_candidate
+                    selected_quality = quality
+                    logger.info(f"✅ Selected: {quality}")
+                    break
+            
+            # Priority 2: Any format with video
+            if not selected_url:
+                for fmt in formats:
+                    mime = str(fmt.get('mime', '') or fmt.get('mimeType', '') or '').lower()
+                    url_candidate = fmt.get('url', '')
+                    
+                    if url_candidate and 'video' in mime:
+                        selected_url = url_candidate
+                        selected_quality = fmt.get('quality', 'auto')
+                        logger.info(f"✅ Using available format: {selected_quality}")
+                        break
+            
+            # Last resort: first format with a URL
+            if not selected_url:
+                for fmt in formats:
+                    url_candidate = fmt.get('url', '')
+                    if url_candidate:
+                        selected_url = url_candidate
+                        logger.warning(f"⚠️ Using fallback format")
+                        break
+            
+            if not selected_url:
+                logger.error("❌ No downloadable URL found")
+                return None
+            
+            # Step 3: Download with browser headers
+            logger.info(f"📥 Downloading {selected_quality}...")
+            
+            browser_headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+                "Accept": "*/*",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Referer": "https://www.youtube.com/",
+                "Origin": "https://www.youtube.com",
+            }
+            
+            response = requests.get(
+                selected_url,
+                headers=browser_headers,
+                stream=True,
+                timeout=self.config.DOWNLOAD_TIMEOUT
+            )
+            
+            if response.status_code not in [200, 206]:
+                logger.error(f"❌ Download failed: HTTP {response.status_code}")
+                return None
+            
+            # Save to temp folder
+            final_path = f"{self.config.TEMP_FOLDER}/video_{video_id}.mp4"
+            part_path = f"{final_path}.part"
+            
+            total_size = int(response.headers.get('content-length', 0))
+            downloaded = 0
+            
+            with open(part_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=1024*1024):  # 1MB chunks
+                    if chunk:
+                        f.write(chunk)
+                        downloaded += len(chunk)
+            
+            # Verify and rename
+            if os.path.exists(part_path) and os.path.getsize(part_path) > 50000:
+                if os.path.exists(final_path):
+                    os.remove(final_path)
+                os.rename(part_path, final_path)
+                logger.info(f"✅ Downloaded: {os.path.getsize(final_path) / (1024*1024):.1f} MB")
+                return final_path
+            else:
+                logger.error("❌ Downloaded file is too small or corrupt")
+                if os.path.exists(part_path):
+                    os.remove(part_path)
+                return None
+                
         except Exception as e:
-            logger.error(f"❌ Download failed: {e}")
+            logger.error(f"❌ Download error: {e}")
             return None
 
     def get_video_duration(self, video_path: str) -> float:
