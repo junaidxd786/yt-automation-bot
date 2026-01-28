@@ -1,8 +1,3 @@
-# Core ML
-torch
-transformers
-ultralytics
-
 # Telegram Bot
 python-telegram-bot>=20.0
 
@@ -18,3 +13,7 @@ requests
 
 # Audio processing
 soundfile
+
+# ML (lightweight versions - torch installed separately in Dockerfile)
+transformers
+ultralytics
