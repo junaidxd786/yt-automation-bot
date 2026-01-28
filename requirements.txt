@@ -3,17 +3,12 @@ python-telegram-bot>=20.0
 
 # Video Processing
 yt-dlp
-opencv-python-headless
-librosa
 numpy
 pillow
 
-# HTTP Requests
-requests
-
-# Audio processing
+# Audio Analysis
+librosa
 soundfile
 
-# ML (lightweight versions - torch installed separately in Dockerfile)
-transformers
-ultralytics
+# HTTP
+requests
