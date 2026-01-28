@@ -362,9 +362,8 @@ class VideoProcessor:
             'format': 'bv*+ba/b',  # Best video + best audio, fallback to best
             'outtmpl': path.replace('.mp4', '') + '.%(ext)s',
             'merge_output_format': 'mp4',
-            'quiet': False,  # Enable output for debugging
-            'no_warnings': False,
-            'verbose': True,  # Full debug output
+            'quiet': True,
+            'no_warnings': True,
         }
         
         if os.path.exists(self.config.COOKIE_FILE):
