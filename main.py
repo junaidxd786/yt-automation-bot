@@ -62,20 +62,38 @@ class Config:
     def setup_cookies(self):
         if self.YOUTUBE_COOKIES:
             try:
-                # If content is base64 encoded (common for multiline env vars), decode it
-                import base64
-                if "Netscape" not in self.YOUTUBE_COOKIES and len(self.YOUTUBE_COOKIES) > 20:
+                # 1. Decode Base64 if needed
+                content = self.YOUTUBE_COOKIES
+                if "Netscape" not in content and "{" not in content and len(content) > 20:
                     try:
-                        decoded = base64.b64decode(self.YOUTUBE_COOKIES).decode('utf-8')
-                        content = decoded
+                        import base64
+                        content = base64.b64decode(content).decode('utf-8')
                     except:
-                        content = self.YOUTUBE_COOKIES
-                else:
-                    content = self.YOUTUBE_COOKIES
-                    
+                        pass
+                
+                # 2. Convert JSON to Netscape (EditThisCookie format -> yt-dlp format)
+                if content.strip().startswith('['):
+                    try:
+                        import json
+                        cookies = json.loads(content)
+                        lines = ["# Netscape HTTP Cookie File"]
+                        for c in cookies:
+                            domain = c.get('domain', '')
+                            flag = 'TRUE' if domain.startswith('.') else 'FALSE'
+                            path = c.get('path', '/')
+                            secure = 'TRUE' if c.get('secure') else 'FALSE'
+                            expiry = str(int(c.get('expirationDate', 0)))
+                            name = c.get('name', '')
+                            value = c.get('value', '')
+                            lines.append(f"{domain}\t{flag}\t{path}\t{secure}\t{expiry}\t{name}\t{value}")
+                        content = "\n".join(lines)
+                        logger.info("✅ Converted JSON cookies to Netscape format")
+                    except Exception as e:
+                        logger.error(f"Cookie conversion error: {e}")
+
                 with open(self.COOKIE_FILE, 'w') as f:
                     f.write(content)
-                logger.info("✅ YouTube Cookies loaded from environment")
+                logger.info("✅ YouTube Cookies loaded")
             except Exception as e:
                 logger.error(f"❌ Failed to load cookies: {e}")
 
