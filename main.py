@@ -359,7 +359,7 @@ class VideoProcessor:
         if os.path.exists(path): os.remove(path)
         
         opts = {
-            'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            'format': 'best[ext=mp4]/best',
             'outtmpl': path.replace('.mp4', ''),
             'merge_output_format': 'mp4',
             'quiet': True,
