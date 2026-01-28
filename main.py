@@ -133,7 +133,6 @@ class YouTubeFinder:
             'default_search': f'ytsearch{max(10, limit * 5)}',
             'extract_flat': 'in_playlist',
             'no_warnings': True,
-            'extractor_args': {'youtube': {'player_client': ['mweb']}},  # Mobile web - least restricted
         }
         
         if os.path.exists(self.config.COOKIE_FILE):
@@ -353,61 +352,43 @@ class VideoProcessor:
         self.config = config
 
     def download_video(self, url: str) -> Optional[str]:
-        """Download video with multi-strategy approach to bypass YouTube blocks."""
-        import time
+        """Download video using POT plugin for YouTube bypass."""
         video_id_match = re.search(r'(?:v=|/)([0-9A-Za-z_-]{11})', url)
         video_id = video_id_match.group(1) if video_id_match else "temp"
         path = f"{self.config.TEMP_FOLDER}/video_{video_id}.mp4"
         if os.path.exists(path): os.remove(path)
         
-        # Strategy list: Try different client combinations
-        strategies = [
-            {'player_client': ['mweb']},           # Mobile web - least restricted
-            {'player_client': ['web']},            # Web client
-            {'player_client': ['android', 'ios']}, # Mobile apps
-            {},                                     # Default (no override)
-        ]
+        opts = {
+            'format': 'b',  # Best available format
+            'outtmpl': path.replace('.mp4', '') + '.%(ext)s',
+            'merge_output_format': 'mp4',
+            'quiet': True,
+            'no_warnings': True,
+        }
         
-        for i, extractor_args in enumerate(strategies):
-            opts = {
-                'format': 'b',  # Just "best" - no format restrictions
-                'outtmpl': path.replace('.mp4', '') + '.%(ext)s',  # Let yt-dlp choose extension
-                'merge_output_format': 'mp4',
-                'quiet': True,
-                'no_warnings': True,
-                'sleep_interval': 2,
-                'max_sleep_interval': 5,
-                'check_formats': False,  # Skip format availability check
-            }
-            
-            if extractor_args:
-                opts['extractor_args'] = {'youtube': extractor_args}
-            
-            if os.path.exists(self.config.COOKIE_FILE):
-                opts['cookiefile'] = self.config.COOKIE_FILE
+        if os.path.exists(self.config.COOKIE_FILE):
+            opts['cookiefile'] = self.config.COOKIE_FILE
 
-            try:
-                logger.info(f"⬇️ Download attempt {i+1}/4 with strategy: {extractor_args.get('player_client', ['default'])}")
-                with yt_dlp.YoutubeDL(opts) as ydl:
-                    ydl.download([url])
-                # Find downloaded file (extension may vary)
-                import glob
-                downloaded_files = glob.glob(path.replace('.mp4', '') + '.*')
-                if downloaded_files:
-                    actual_path = downloaded_files[0]
-                    # Rename to .mp4 if needed
-                    if not actual_path.endswith('.mp4'):
-                        import shutil
-                        shutil.move(actual_path, path)
-                        actual_path = path
-                    logger.info(f"✅ Downloaded: {os.path.getsize(actual_path) / (1024*1024):.1f} MB")
-                    return actual_path
-            except Exception as e:
-                logger.warning(f"Strategy {i+1} failed: {e}")
-                time.sleep(3)
-        
-        logger.error(f"❌ All download strategies failed for {video_id}")
-        return None
+        try:
+            logger.info(f"⬇️ Downloading video {video_id}...")
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                ydl.download([url])
+            
+            # Find downloaded file (extension may vary)
+            import glob
+            downloaded_files = glob.glob(path.replace('.mp4', '') + '.*')
+            if downloaded_files:
+                actual_path = downloaded_files[0]
+                if not actual_path.endswith('.mp4'):
+                    import shutil
+                    shutil.move(actual_path, path)
+                    actual_path = path
+                logger.info(f"✅ Downloaded: {os.path.getsize(actual_path) / (1024*1024):.1f} MB")
+                return actual_path
+            return None
+        except Exception as e:
+            logger.error(f"❌ Download failed: {e}")
+            return None
 
     def get_video_duration(self, video_path: str) -> float:
         """Get video duration using ffprobe."""
