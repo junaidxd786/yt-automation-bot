@@ -50,10 +50,10 @@ class Config:
     OUTPUT_FOLDER: str = './data/output'
     TEMP_FOLDER: str = './data/temp_processing'
     
-    TELEGRAM_BOT_TOKEN: str = os.getenv('TELEGRAM_BOT_TOKEN', '')
-    TELEGRAM_CHAT_ID: str = os.getenv('TELEGRAM_CHAT_ID', '')
-    DEEPGRAM_API_KEY: str = os.getenv('DEEPGRAM_API_KEY', '')
-    GEMINI_API_KEY: str = os.getenv('GEMINI_API_KEY', '')
+    TELEGRAM_BOT_TOKEN: str = os.getenv('TELEGRAM_BOT_TOKEN', '').strip()
+    TELEGRAM_CHAT_ID: str = os.getenv('TELEGRAM_CHAT_ID', '').strip()
+    DEEPGRAM_API_KEY: str = os.getenv('DEEPGRAM_API_KEY', '').strip()
+    GEMINI_API_KEY: str = os.getenv('GEMINI_API_KEY', '').strip()
     
     FFMPEG_TIMEOUT: int = 600
     
