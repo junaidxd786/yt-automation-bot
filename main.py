@@ -538,9 +538,15 @@ class BotInterface:
             await message.reply_text(f"❌ Error: {e}")
             logger.error("Error", exc_info=True)
 
+    async def error_handler(self, update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Log the error and handle specific cases."""
+        logger.error(f"Exception while handling an update: {context.error}")
+        
     def run(self):
         logger.info("🤖 Starting bot...")
-        self.app.run_polling()
+        self.app.add_error_handler(self.error_handler)
+        # Drop pending updates to flush old conflicting messages
+        self.app.run_polling(drop_pending_updates=True, close_loop=False)
 
 # ==================== MAIN ====================
 
