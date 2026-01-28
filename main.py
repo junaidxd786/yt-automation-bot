@@ -54,9 +54,31 @@ class Config:
     TELEGRAM_CHAT_ID: str = os.getenv('TELEGRAM_CHAT_ID', '').strip()
     DEEPGRAM_API_KEY: str = os.getenv('DEEPGRAM_API_KEY', '').strip()
     GEMINI_API_KEY: str = os.getenv('GEMINI_API_KEY', '').strip()
+    YOUTUBE_COOKIES: str = os.getenv('YOUTUBE_COOKIES', '').strip()
     
     FFMPEG_TIMEOUT: int = 600
-    
+    COOKIE_FILE: str = './data/cookies.txt'
+
+    def setup_cookies(self):
+        if self.YOUTUBE_COOKIES:
+            try:
+                # If content is base64 encoded (common for multiline env vars), decode it
+                import base64
+                if "Netscape" not in self.YOUTUBE_COOKIES and len(self.YOUTUBE_COOKIES) > 20:
+                    try:
+                        decoded = base64.b64decode(self.YOUTUBE_COOKIES).decode('utf-8')
+                        content = decoded
+                    except:
+                        content = self.YOUTUBE_COOKIES
+                else:
+                    content = self.YOUTUBE_COOKIES
+                    
+                with open(self.COOKIE_FILE, 'w') as f:
+                    f.write(content)
+                logger.info("✅ YouTube Cookies loaded from environment")
+            except Exception as e:
+                logger.error(f"❌ Failed to load cookies: {e}")
+
     def setup_directories(self):
         for folder in [self.OUTPUT_FOLDER, self.TEMP_FOLDER]:
             os.makedirs(folder, exist_ok=True)
@@ -75,6 +97,7 @@ class Config:
 
 CONFIG = Config()
 CONFIG.setup_directories()
+CONFIG.setup_cookies()
 CONFIG.validate()
 
 # ==================== YOUTUBE FINDER ====================
@@ -92,7 +115,11 @@ class YouTubeFinder:
             'default_search': f'ytsearch{max(10, limit * 5)}',
             'extract_flat': 'in_playlist',
             'no_warnings': True,
+            'extractor_args': {'youtube': {'player_client': ['android', 'ios']}},
         }
+        
+        if os.path.exists(self.config.COOKIE_FILE):
+             ydl_opts['cookiefile'] = self.config.COOKIE_FILE
         
         candidates = []
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -319,7 +346,12 @@ class VideoProcessor:
             'merge_output_format': 'mp4',
             'quiet': True,
             'no_warnings': True,
+            # Anti-403: Use Android client which is less strictly blocked in datacenters
+            'extractor_args': {'youtube': {'player_client': ['android', 'ios']}},
         }
+        
+        if os.path.exists(self.config.COOKIE_FILE):
+             opts['cookiefile'] = self.config.COOKIE_FILE
 
         try:
             with yt_dlp.YoutubeDL(opts) as ydl:
