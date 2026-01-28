@@ -1,75 +1,80 @@
-# YouTube Shorts Generator - Railway Edition
+# 🎬 YouTube Shorts Generator
 
-AI-powered YouTube Shorts generator that runs on Railway.
+AI-powered tool that automatically finds viral moments in long-form YouTube videos and converts them into engaging short-form content.
 
-## Features
+![Python](https://img.shields.io/badge/Python-3.11-blue)
+![Docker](https://img.shields.io/badge/Docker-Ready-2496ED)
+![License](https://img.shields.io/badge/License-MIT-green)
 
-- 🧠 **Deep ML Scoring**: Audio + Sentiment + Viral Keywords
-- 🎣 **Hook Detection**: AI analyzes first 5 seconds
-- 📊 **Viral Score**: Predicts viral potential (0-100)
-- 🏷️ **Trending Hashtags**: Niche-aware hashtag generation
-- 📝 **Auto Subtitles**: ASS subtitles burned in
-- 👤 **Smart Crop**: YOLO person tracking
+## ✨ Features
 
-## Quick Deploy to Railway
+| Feature | Description |
+|---------|-------------|
+| 🧠 **Deep ML Scoring** | Analyzes audio energy, sentiment, and viral keywords |
+| 🎣 **Hook Detection** | AI evaluates first 5 seconds for engagement potential |
+| 📊 **Viral Prediction** | Scores clips 0-100 based on multiple factors |
+| 🏷️ **Smart Hashtags** | Generates niche-aware trending hashtags |
+| 📝 **Auto Subtitles** | Burns in word-by-word captions |
+| 👤 **Smart Cropping** | YOLO-based person tracking for vertical format |
 
-1. **Fork/Clone this repo**
+## 🛠️ Tech Stack
 
-2. **Create Railway Project**
-   - Go to [railway.app](https://railway.app)
-   - New Project → Deploy from GitHub
-   - Select this repo
+- **ML Models**: RoBERTa (sentiment), YOLOv8 (person detection)
+- **Transcription**: Deepgram Nova-2
+- **Content AI**: Google Gemini 2.0
+- **Video Processing**: FFmpeg with hardware acceleration
+- **Interface**: Telegram Bot API
 
-3. **Add Environment Variables**
-   In Railway dashboard → Variables:
-   ```
-   TELEGRAM_BOT_TOKEN=your_bot_token
-   TELEGRAM_CHAT_ID=your_chat_id
-   DEEPGRAM_API_KEY=your_deepgram_key
-   GEMINI_API_KEY=your_gemini_key
-   ```
+## 📸 How It Works
 
-4. **Deploy** - Railway auto-builds from Dockerfile
-
-## Local Development
-
-```bash
-# Clone
-git clone <your-repo>
-cd youtube_shorts_railway
-
-# Create .env file
-cp .env.example .env
-# Edit .env with your keys
-
-# Build & Run
-docker build -t shorts-bot .
-docker run --env-file .env shorts-bot
+```
+1. /auto tech podcasts     → Search YouTube
+2. Approve found videos    → Select what to process
+3. Enter clip count        → How many shorts to create
+4. AI analyzes content     → Finds best moments
+5. Receive finished clips  → Sent to Telegram
 ```
 
-## Usage
+## 🚀 Quick Start
 
-1. Open Telegram and message your bot
-2. Send `/start` to see commands
-3. Send `/auto tech podcasts` to find videos
-4. Approve videos and enter clip count
-5. Clips are sent directly to Telegram!
+### Prerequisites
+- Python 3.11+
+- Docker (recommended)
+- API Keys: Telegram Bot, Deepgram, Gemini
 
-## Environment Variables
+### Run with Docker
 
-| Variable | Description |
-|----------|-------------|
-| `TELEGRAM_BOT_TOKEN` | From @BotFather |
-| `TELEGRAM_CHAT_ID` | Your chat ID |
-| `DEEPGRAM_API_KEY` | For transcription |
-| `GEMINI_API_KEY` | For SEO & hook analysis |
+```bash
+docker build -t shorts-generator .
+docker run --env-file .env shorts-generator
+```
 
-## Cost Estimates
+### Environment Variables
 
-- **Railway**: ~$5/month (hobby plan)
-- **Deepgram**: Free tier = 12,500 mins/month
-- **Gemini**: Free tier = 60 req/min
+Create a `.env` file:
+
+```env
+TELEGRAM_BOT_TOKEN=your_token
+TELEGRAM_CHAT_ID=your_chat_id
+DEEPGRAM_API_KEY=your_key
+GEMINI_API_KEY=your_key
+```
+
+## 📁 Project Structure
+
+```
+├── main.py           # Core application
+├── Dockerfile        # Container configuration
+├── requirements.txt  # Python dependencies
+└── data/             # Runtime data (gitignored)
+```
+
+## 📄 License
+
+MIT License - feel free to use and modify.
 
 ---
 
-Built for Railway deployment. Original Colab version: v10 Ultra.
+<p align="center">
+  <b>Transform long videos into viral shorts with AI</b>
+</p>
