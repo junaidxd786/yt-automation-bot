@@ -1,3 +1,4 @@
+# Build v2 - Fixed for Debian Trixie
 FROM python:3.11-slim
 
 # Install system dependencies
