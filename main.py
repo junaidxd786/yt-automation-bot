@@ -359,11 +359,12 @@ class VideoProcessor:
         if os.path.exists(path): os.remove(path)
         
         opts = {
-            'format': 'b',  # Best available format
+            'format': 'bv*+ba/b',  # Best video + best audio, fallback to best
             'outtmpl': path.replace('.mp4', '') + '.%(ext)s',
             'merge_output_format': 'mp4',
-            'quiet': True,
-            'no_warnings': True,
+            'quiet': False,  # Enable output for debugging
+            'no_warnings': False,
+            'verbose': True,  # Full debug output
         }
         
         if os.path.exists(self.config.COOKIE_FILE):

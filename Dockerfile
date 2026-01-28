@@ -1,15 +1,21 @@
-# Build v6 - With PO Token Provider for YouTube bypass
+# Build v7 - With PO Token + Deno for SABR streaming
 FROM python:3.11-slim
 
-# Install system dependencies including Node.js for POT provider
+# Install system dependencies including Node.js and Deno
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     fonts-dejavu-core \
     curl \
     git \
+    unzip \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
+    && curl -fsSL https://deno.land/install.sh | sh \
     && rm -rf /var/lib/apt/lists/*
+
+# Add Deno to PATH
+ENV DENO_INSTALL="/root/.deno"
+ENV PATH="$DENO_INSTALL/bin:$PATH"
 
 WORKDIR /app
 
