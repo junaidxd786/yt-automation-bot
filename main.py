@@ -370,13 +370,14 @@ class VideoProcessor:
         
         for i, extractor_args in enumerate(strategies):
             opts = {
-                'format': 'best[ext=mp4]/best',
-                'outtmpl': path.replace('.mp4', ''),
+                'format': 'b',  # Just "best" - no format restrictions
+                'outtmpl': path.replace('.mp4', '') + '.%(ext)s',  # Let yt-dlp choose extension
                 'merge_output_format': 'mp4',
                 'quiet': True,
                 'no_warnings': True,
-                'sleep_interval': 2,      # Wait 2s between requests
-                'max_sleep_interval': 5,  # Max 5s wait
+                'sleep_interval': 2,
+                'max_sleep_interval': 5,
+                'check_formats': False,  # Skip format availability check
             }
             
             if extractor_args:
@@ -389,12 +390,21 @@ class VideoProcessor:
                 logger.info(f"⬇️ Download attempt {i+1}/4 with strategy: {extractor_args.get('player_client', ['default'])}")
                 with yt_dlp.YoutubeDL(opts) as ydl:
                     ydl.download([url])
-                if os.path.exists(path):
-                    logger.info(f"✅ Downloaded: {os.path.getsize(path) / (1024*1024):.1f} MB")
-                    return path
+                # Find downloaded file (extension may vary)
+                import glob
+                downloaded_files = glob.glob(path.replace('.mp4', '') + '.*')
+                if downloaded_files:
+                    actual_path = downloaded_files[0]
+                    # Rename to .mp4 if needed
+                    if not actual_path.endswith('.mp4'):
+                        import shutil
+                        shutil.move(actual_path, path)
+                        actual_path = path
+                    logger.info(f"✅ Downloaded: {os.path.getsize(actual_path) / (1024*1024):.1f} MB")
+                    return actual_path
             except Exception as e:
                 logger.warning(f"Strategy {i+1} failed: {e}")
-                time.sleep(3)  # Wait before trying next strategy
+                time.sleep(3)
         
         logger.error(f"❌ All download strategies failed for {video_id}")
         return None
