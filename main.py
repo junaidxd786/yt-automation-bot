@@ -133,7 +133,7 @@ class YouTubeFinder:
             'default_search': f'ytsearch{max(10, limit * 5)}',
             'extract_flat': 'in_playlist',
             'no_warnings': True,
-            'extractor_args': {'youtube': {'player_client': ['android', 'ios']}},
+            'extractor_args': {'youtube': {'player_client': ['mweb']}},  # Mobile web - least restricted
         }
         
         if os.path.exists(self.config.COOKIE_FILE):
@@ -353,34 +353,51 @@ class VideoProcessor:
         self.config = config
 
     def download_video(self, url: str) -> Optional[str]:
+        """Download video with multi-strategy approach to bypass YouTube blocks."""
+        import time
         video_id_match = re.search(r'(?:v=|/)([0-9A-Za-z_-]{11})', url)
         video_id = video_id_match.group(1) if video_id_match else "temp"
         path = f"{self.config.TEMP_FOLDER}/video_{video_id}.mp4"
         if os.path.exists(path): os.remove(path)
         
-        opts = {
-            'format': 'best[ext=mp4]/best',
-            'outtmpl': path.replace('.mp4', ''),
-            'merge_output_format': 'mp4',
-            'quiet': True,
-            'no_warnings': True,
-            # Anti-403: Use Android client which is less strictly blocked in datacenters
-            'extractor_args': {'youtube': {'player_client': ['android', 'ios']}},
-        }
+        # Strategy list: Try different client combinations
+        strategies = [
+            {'player_client': ['mweb']},           # Mobile web - least restricted
+            {'player_client': ['web']},            # Web client
+            {'player_client': ['android', 'ios']}, # Mobile apps
+            {},                                     # Default (no override)
+        ]
         
-        if os.path.exists(self.config.COOKIE_FILE):
-             opts['cookiefile'] = self.config.COOKIE_FILE
+        for i, extractor_args in enumerate(strategies):
+            opts = {
+                'format': 'best[ext=mp4]/best',
+                'outtmpl': path.replace('.mp4', ''),
+                'merge_output_format': 'mp4',
+                'quiet': True,
+                'no_warnings': True,
+                'sleep_interval': 2,      # Wait 2s between requests
+                'max_sleep_interval': 5,  # Max 5s wait
+            }
+            
+            if extractor_args:
+                opts['extractor_args'] = {'youtube': extractor_args}
+            
+            if os.path.exists(self.config.COOKIE_FILE):
+                opts['cookiefile'] = self.config.COOKIE_FILE
 
-        try:
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                ydl.download([url])
-            if os.path.exists(path):
-                logger.info(f"✅ Downloaded: {os.path.getsize(path) / (1024*1024):.1f} MB")
-                return path
-            return None
-        except Exception as e:
-            logger.error(f"Download failed: {e}")
-            return None
+            try:
+                logger.info(f"⬇️ Download attempt {i+1}/4 with strategy: {extractor_args.get('player_client', ['default'])}")
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    ydl.download([url])
+                if os.path.exists(path):
+                    logger.info(f"✅ Downloaded: {os.path.getsize(path) / (1024*1024):.1f} MB")
+                    return path
+            except Exception as e:
+                logger.warning(f"Strategy {i+1} failed: {e}")
+                time.sleep(3)  # Wait before trying next strategy
+        
+        logger.error(f"❌ All download strategies failed for {video_id}")
+        return None
 
     def get_video_duration(self, video_path: str) -> float:
         """Get video duration using ffprobe."""
