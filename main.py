@@ -103,9 +103,6 @@ class YouTubeFinder:
             'no_warnings': True,
         }
         
-        if os.path.exists(self.config.COOKIE_FILE):
-             ydl_opts['cookiefile'] = self.config.COOKIE_FILE
-        
         candidates = []
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             res = ydl.extract_info(query, download=False)
